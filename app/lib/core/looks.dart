@@ -233,13 +233,13 @@ abstract final class Bodies {
   /// 生氣: points on top.
   static const spiky = [
     Puff(0, 8, 60, 36),
-    Puff(-26, -24, 13, 28, rot: -35, tip: 1),
-    Puff(0, -32, 13, 30, tip: 1),
-    Puff(26, -24, 13, 28, rot: 35, tip: 1),
+    Puff(-24, -22, 12, 26, rot: -30, tip: 1),
+    Puff(0, -28, 12, 28, tip: 1),
+    Puff(24, -22, 12, 26, rot: 30, tip: 1),
     Puff(50, 10, 16, 14),
     Puff(-50, 10, 16, 14),
-    Puff(-48, -8, 12, 24, rot: -70, tip: 1),
-    Puff(48, -8, 12, 24, rot: 70, tip: 1),
+    Puff(-42, -6, 10, 19, rot: -60, tip: 1),
+    Puff(42, -6, 10, 19, rot: 60, tip: 1),
   ];
 
   /// 害怕: shrunk and wobbly.

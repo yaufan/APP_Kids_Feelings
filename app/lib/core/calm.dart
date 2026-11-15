@@ -14,7 +14,7 @@ enum CalmWay {
 
   final String zh;
 
-  /// Its picture: assets/art/calm/way_<art>.svg.
+  /// Its picture: assets/art/calm/`way_<art>.svg`.
   final String art;
 
   /// How 棉棉 feels when it starts.

@@ -311,8 +311,7 @@ class Game {
       diary: {
         if (d is Map)
           for (final e in d.entries)
-            if (e.key is String && Days.parse(e.key as String) != null)
-              if (DiaryEntry.fromJson(e.value) case final entry?) e.key as String: entry,
+            if (e.key is String && Days.parse(e.key as String) != null && DiaryEntry.fromJson(e.value) != null) e.key as String: DiaryEntry.fromJson(e.value)!,
       },
       restSince: rest is String ? DateTime.tryParse(rest) : null,
       told: [

@@ -18,10 +18,10 @@ enum CloudKind {
   baby,
 }
 
-/// Where a story happens: a background picture (assets/art/stories/bg_<name>.svg).
+/// Where a story happens: a background picture (`assets/art/stories/bg_<name>.svg`).
 enum StoryPlace { home, school, park, night, clinic, market, rain }
 
-/// A picture on top of the background: assets/art/stories/<art>.svg, its
+/// A picture on top of the background: `assets/art/stories/<art>.svg`, its
 /// middle at [x] and its bottom at [y] (fractions of the 4:3 picture), [w]
 /// wide (a fraction of the picture's width).
 class Prop {

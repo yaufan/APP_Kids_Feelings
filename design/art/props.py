@@ -183,7 +183,7 @@ def door(kind):
 def cloud_small():
     """A diary day nothing was written on: a pale dashed-looking cloud (dots round a cloud)."""
     c = Ctx(60, 50)
-    c.mallow(kit.puffs(30, 30, 44, 30, n=3, key="day"), "#EDE7F5", shadow=False, shade=False, op=.7)
+    c.mallow(kit.puffs(30, 30, 44, 30, n=3, key="day"), "#DDD3EE", shadow=False, shade=False)
     return c.svg()
 
 

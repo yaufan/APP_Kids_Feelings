@@ -1,6 +1,5 @@
 import '../core/calm.dart';
 import '../core/feelings.dart';
-import '../core/stories.dart';
 
 /// Everything the app says, in Traditional Chinese (Taiwan).
 abstract final class Strings {
@@ -148,5 +147,4 @@ abstract final class Strings {
   static const privacy = '不連網、不定位、沒有廣告、沒有帳號；心情日記只存在這支手機裡，不會傳給任何人。';
   static String version(String v) => '版本 $v';
 
-  static String storyTitle(Story s) => s.title;
 }

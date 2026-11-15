@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:feelings_house/core/feelings.dart';
 import 'package:feelings_house/core/game.dart';
 import 'package:feelings_house/features/parent/parent_gate.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -79,6 +80,31 @@ void main() {
     app.go('/');
     await app.settle(2600);
     expect(app.location, '/rest', reason: 'out of 冷靜小屋, the rest goes on');
+    await app.end();
+  });
+
+  testWidgets('怎麼辦 never asks about a feeling the parent turned off', (tester) async {
+    final app = await TestApp.start(tester, game: const Game(settings: Settings(level: Level.big)).copyWith(settings: const Settings(level: Level.big).copyWith(hidden: {Feeling.angry, Feeling.sad, Feeling.scared, Feeling.nervous})));
+    app.go('/help');
+    await app.settle(800);
+    // Two basic feelings always stay on, so 難過 came back (and parent mode shows it on).
+    expect(app.game.settings.hidden, {Feeling.angry, Feeling.scared, Feeling.nervous});
+    await app.tapLabel('抱抱小雨', ms: 1200);
+    await app.tapLabel('下一個', ms: 800);
+    expect(app.voice.said.last, '如果你很難過，可以怎麼做？');
+    for (final off in ['生氣', '害怕', '緊張']) {
+      expect(app.voice.said.where((l) => l.startsWith('如果你很$off')), isEmpty);
+    }
+    await app.end();
+  });
+
+  testWidgets('with 生氣 off, 怎麼辦 asks about another feeling', (tester) async {
+    final app = await TestApp.start(tester, game: const Game().copyWith(settings: const Settings(level: Level.big).copyWith(hidden: {Feeling.angry})));
+    app.go('/help');
+    await app.settle(800);
+    await app.tapLabel('抱抱小雨', ms: 1200);
+    await app.tapLabel('下一個', ms: 800);
+    expect(app.voice.said.last, '如果你很難過，可以怎麼做？');
     await app.end();
   });
 }

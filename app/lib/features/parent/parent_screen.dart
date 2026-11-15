@@ -132,13 +132,15 @@ class ParentScreen extends ConsumerWidget {
         if (s.level == Level.big && s.full)
           section(Strings.feelingsTitle, [
             const Text(Strings.feelingsNote, style: note),
+            if (Feeling.basics.where((b) => !s.hidden.contains(b)).length <= Settings.minBasics)
+              const Padding(padding: EdgeInsets.only(top: 4), child: Text(Strings.feelingsMin, style: TextStyle(fontSize: 14, color: Mallow.coral))),
             Wrap(spacing: 8, runSpacing: 4, children: [
               for (final f in Feeling.values)
                 FilterChip(
                   key: ValueKey('feeling-${f.name}'),
                   label: Text(f.zh, style: const TextStyle(fontSize: 16)),
                   selected: !s.hidden.contains(f),
-                  onSelected: Settings.canHide(f) ? (on) => game.settings((x) => x.copyWith(hidden: on ? ({...x.hidden}..remove(f)) : {...x.hidden, f})) : null,
+                  onSelected: s.canHideNow(f) ? (on) => game.settings((x) => x.copyWith(hidden: on ? ({...x.hidden}..remove(f)) : {...x.hidden, f})) : null,
                   selectedColor: const Color(0xFFD8F0E6),
                 ),
             ]),

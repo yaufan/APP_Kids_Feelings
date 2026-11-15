@@ -116,6 +116,7 @@ abstract final class Strings {
   static const shake = '搥枕頭時，搖手機也可以';
   static const feelingsTitle = '要哪些心情';
   static const feelingsNote = '可以先關掉一些（例如害怕），之後再打開；開心和安心一定有。';
+  static const feelingsMin = '開心、難過、生氣、害怕至少要留兩種（小小只玩這四種）。';
   static const diaryTitle = '心情日記';
   static const diaryNone = '這個星期還沒有寫日記。';
   static String mostFelt(Feeling f) => '這個月最常選的：${f.zh}';

@@ -40,9 +40,31 @@ void main() {
       expect(s.feelings, isNot(contains(Feeling.scared)));
       expect(s.feelings.length, 12);
       expect(Settings.canHide(Feeling.happy), isFalse);
-      expect(small.copyWith(hidden: {Feeling.sad, Feeling.angry, Feeling.scared}).feelings, Feeling.basics, reason: 'one left is not a question');
       final read = Settings.fromJson({'hidden': ['happy', 'calm', 'scared', 'nothing']});
       expect(read.hidden, {Feeling.scared});
+    });
+
+    test('a hidden feeling never comes back, and two basic ones always stay', () {
+      // Asking to hide three of the four: one comes back, and the settings say so.
+      final s = small.copyWith(hidden: {Feeling.sad, Feeling.angry, Feeling.scared});
+      expect(s.feelings.length, 2);
+      expect(s.feelings.where(s.hidden.contains), isEmpty, reason: 'what parent mode shows as off is off');
+      expect(Settings.fromJson({'hidden': ['sad', 'angry', 'scared', 'jealous']}).hidden, {Feeling.angry, Feeling.scared, Feeling.jealous});
+      // Parent mode cannot switch off the one that would leave fewer than two.
+      final two = big.copyWith(hidden: {Feeling.sad, Feeling.angry});
+      expect(two.canHideNow(Feeling.scared), isFalse);
+      expect(two.canHideNow(Feeling.angry), isTrue, reason: 'turning one back on is always fine');
+      expect(two.canHideNow(Feeling.jealous), isTrue);
+      expect(big.canHideNow(Feeling.happy), isFalse);
+      // Whatever is hidden, at every level and in the free version.
+      final all = {for (final f in Feeling.values) if (Settings.canHide(f)) f};
+      for (final level in Level.values) {
+        for (final full in [true, false]) {
+          final x = Settings(level: level, full: full).copyWith(hidden: all);
+          expect(x.feelings.length, greaterThanOrEqualTo(2), reason: '$level $full');
+          expect(x.feelings.where(x.hidden.contains), isEmpty, reason: '$level $full');
+        }
+      }
     });
   });
 
@@ -225,6 +247,17 @@ void main() {
       }
       expect(g.diary.length, lessThanOrEqualTo(Game.keepDays + 1));
       expect(g.diary.keys, isNot(contains('2026-01-01')));
+    });
+  });
+
+  group('the rest', () {
+    test('an hour after the time ran out; a clock moved back does not lock the app', () {
+      final g = const Game().rest(DateTime(2026, 11, 15, 10));
+      expect(g.resting(DateTime(2026, 11, 15, 10, 30)), isTrue);
+      expect(g.resting(DateTime(2026, 11, 15, 11)), isFalse);
+      expect(g.resting(DateTime(2026, 11, 15, 9, 59)), isFalse, reason: 'the clock went back a minute');
+      expect(g.resting(DateTime(2026, 11, 14, 10)), isFalse, reason: 'the clock went back a day');
+      expect(const Game().resting(DateTime(2026, 11, 15)), isFalse);
     });
   });
 

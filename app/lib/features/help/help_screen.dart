@@ -30,7 +30,9 @@ class HelpScreen extends ConsumerStatefulWidget {
 class _HelpScreenState extends ConsumerState<HelpScreen> {
   late final Story _story;
   late final Feeling _feels;
-  late final Feeling _self;
+  /// The child's own feeling for the second round (null: none of them is
+  /// on, so that round is skipped).
+  late final Feeling? _self;
   HelpWay? _help;
   var _selfRound = false;
 
@@ -43,7 +45,7 @@ class _HelpScreenState extends ConsumerState<HelpScreen> {
     _story = list[g.turn % list.length];
     _feels = _story.rightAt(s.level).firstWhere(s.feelings.contains);
     final selves = [Feeling.angry, Feeling.sad, Feeling.scared, if (s.level == Level.big) Feeling.nervous].where(s.feelings.contains).toList();
-    _self = selves.isEmpty ? Feeling.angry : selves[g.turn % selves.length];
+    _self = selves.isEmpty ? null : selves[g.turn % selves.length];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(gameProvider.notifier).change((g) => g.nextTurn());
@@ -51,7 +53,7 @@ class _HelpScreenState extends ConsumerState<HelpScreen> {
     });
   }
 
-  String get _line => _selfRound ? Strings.selfAsk(_self) : (_help?.result ?? '${_story.line}\n${Strings.helpAsk(_feels, _feels.pleasant)}');
+  String get _line => _selfRound ? Strings.selfAsk(_self!) : (_help?.result ?? '${_story.line}\n${Strings.helpAsk(_feels, _feels.pleasant)}');
 
   void _say() {
     if (mounted) speak(ref, _line.replaceAll('\n', ''));
@@ -75,7 +77,7 @@ class _HelpScreenState extends ConsumerState<HelpScreen> {
   /// The ways to try for the child's own feeling, among the ones on offer.
   List<CalmWay> get _ways {
     final on = ref.read(gameProvider).settings.calmWays;
-    final ways = [for (final w in CalmWay.forFeeling(_self)) if (on.contains(w)) w];
+    final ways = [for (final w in CalmWay.forFeeling(_self!)) if (on.contains(w)) w];
     for (final w in on) {
       if (ways.length >= 3) break;
       if (!ways.contains(w)) ways.add(w);
@@ -106,7 +108,7 @@ class _HelpScreenState extends ConsumerState<HelpScreen> {
                                   child: Container(
                                     decoration: mallowBox(Colors.white, radius: 26),
                                     padding: const EdgeInsets.all(18),
-                                    child: Bob(amount: 3, child: Cloud(key: const ValueKey('self'), feeling: _self)),
+                                    child: Bob(amount: 3, child: Cloud(key: const ValueKey('self'), feeling: _self!)),
                                   ),
                                 )
                               : StoryPicture(story: _story, feeling: _help == null ? _feels : (_feels.pleasant ? Feeling.happy : Feeling.calm), helper: _help),
@@ -162,7 +164,7 @@ class _HelpScreenState extends ConsumerState<HelpScreen> {
     return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       Wrap(spacing: 10, runSpacing: 10, alignment: WrapAlignment.center, children: [
         PillButton(label: Strings.home, color: Colors.white, icon: Icons.home_rounded, onTap: () => context.go('/')),
-        PillButton(label: Strings.nextOne, icon: Icons.arrow_forward_rounded, onTap: _toSelf),
+        if (_self != null) PillButton(label: Strings.nextOne, icon: Icons.arrow_forward_rounded, onTap: _toSelf),
       ]),
       const SizedBox(height: 14),
       const Text(Strings.shareNote, style: TextStyle(fontSize: 13, color: Mallow.inkSoft)),

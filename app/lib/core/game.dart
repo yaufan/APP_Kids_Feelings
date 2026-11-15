@@ -45,12 +45,33 @@ class Settings {
   /// 開心 and 安心 always stay (the app comes back to them).
   static bool canHide(Feeling f) => f != Feeling.happy && f != Feeling.calm;
 
+  /// At least this many basic feelings stay on, so 小小 (and the free
+  /// version, which have only the basic four) always has a question with two
+  /// cards. 大 always keeps 開心 and 安心.
+  static const minBasics = 2;
+
+  /// Whether a parent may turn [f] off now: never 開心 or 安心, and never the
+  /// basic feeling that would leave fewer than [minBasics] (parent mode
+  /// disables that switch: 「至少要留兩種」).
+  bool canHideNow(Feeling f) => canHide(f) && (hidden.contains(f) || !f.basic || Feeling.basics.where((b) => !hidden.contains(b) && b != f).length >= minBasics);
+
+  /// [hidden] made safe: anything that may not be hidden is turned back on,
+  /// and basic feelings come back (first ones first) until [minBasics] show.
+  static Set<Feeling> tidy(Set<Feeling> hidden) {
+    final out = {for (final f in hidden) if (canHide(f)) f};
+    for (final b in Feeling.basics) {
+      if (Feeling.basics.where((x) => !out.contains(x)).length >= minBasics) break;
+      out.remove(b);
+    }
+    return out;
+  }
+
   /// The feelings the child meets: four at 小小 (and in the free version),
-  /// fourteen at 大, minus the ones turned off.
+  /// fourteen at 大, minus the ones turned off. Never a hidden one: [tidy]
+  /// (applied by [copyWith] and [Settings.fromJson]) keeps at least two.
   List<Feeling> get feelings {
     final base = level == Level.small || !full ? Feeling.basics : Feeling.values;
-    final shown = [for (final f in base) if (!hidden.contains(f)) f];
-    return shown.length >= 2 ? shown : base;
+    return [for (final f in base) if (!hidden.contains(f)) f];
   }
 
   /// The calming ways on offer.
@@ -68,7 +89,7 @@ class Settings {
         minutes: minutes ?? this.minutes,
         cards: cards ?? this.cards,
         shake: shake ?? this.shake,
-        hidden: hidden ?? this.hidden,
+        hidden: hidden == null ? this.hidden : tidy(hidden),
         english: english ?? this.english,
         music: music ?? this.music,
         sounds: sounds ?? this.sounds,
@@ -97,11 +118,10 @@ class Settings {
       minutes: m is int && minuteChoices.contains(m) ? m : 15,
       cards: flag('cards', true),
       shake: flag('shake', true),
-      hidden: {
+      hidden: tidy({
         if (hidden is List)
-          for (final n in hidden)
-            if (Feeling.values.asNameMap()[n] case final f? when canHide(f)) f,
-      },
+          for (final n in hidden) ?Feeling.values.asNameMap()[n],
+      }),
       english: flag('english', false),
       music: flag('music', true),
       sounds: flag('sounds', true),
@@ -199,7 +219,15 @@ class Game {
   /// How many days the diary keeps.
   static const keepDays = 120;
 
-  bool resting(DateTime now) => restSince != null && now.difference(restSince!) < restLength;
+  /// Resting for an hour after the time ran out. A clock moved back (the
+  /// time now before the rest began) does not lock the app: it counts as
+  /// rested.
+  bool resting(DateTime now) {
+    final since = restSince;
+    if (since == null) return false;
+    final d = now.difference(since);
+    return !d.isNegative && d < restLength;
+  }
 
   DiaryEntry? entry(DateTime d) => diary[Days.key(d)];
 

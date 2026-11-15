@@ -64,5 +64,5 @@
 - 圖：`design/art/`（`kit.py` 棉花糖畫法、`house.py`、`props.py`、`scenes.py`、`mianmian.py` 讀 `looks.dart` 畫棉棉、`icon.py`；`build.py all`、`sheet`、`fluttercheck`）；聲音：`design/sounds/make_sounds.py`（42 個檔）。
 
 ## 目前的狀態（2026-11-15）
-- 0.1.0 做好、測試都過了；GitHub 專案建好了，工作分支 `claude/relaxed-albattani-6mbwpz` 已推上去（GitHub 的 main 只有建專案時自動加的檔案，已經合併進工作分支，所以之後 main 可以直接快轉）。推 main 前要先問，Secrets 要先加。
+- 0.1.0 已發布（2026-11-15）：Releases 有三個 APK，App 和 Release 都成功；Secrets 加好了。
 - 還沒在真手機上試過：TTS 的聲音、搖手機的力道（`SystemShakes.threshold`）、聲音好不好聽，要使用者裝到手機後再看。

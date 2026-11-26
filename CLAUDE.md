@@ -12,15 +12,16 @@
 
 ## 這個 APP
 - 給 **2～5 歲**的小朋友，在台灣，國語為主：認識心情、說出心情、讓自己冷靜下來。主角是一朵會變心情的雲「棉棉」（形狀、顏色、臉都跟心情變）。
-- 五個房間：認表情、小故事（這是什麼心情）、冷靜小屋（吹氣球深呼吸、數到四、抱抱、搥枕頭、喝水、找大人；不限時）、怎麼辦、心情日記；每個故事後都有「家長一起說」問題卡（可跳過）。
+- 五個房間：認表情、小故事（這是什麼心情）、冷靜小屋（吹氣球深呼吸、數到四、抱抱、搥枕頭、喝水、找大人；家長從家長模式打開的不限時）、怎麼辦、心情日記；每個故事後都有「家長一起說」問題卡（可跳過）。
 - 兩個難度：小小（2～3 歲）四種心情；大（4～5 歲）十四種（開心、難過、生氣、害怕、驚訝、害羞、緊張、失望、得意、累累的、無聊、嫉妒、安心、委屈）。
 - 不教分享輪流（留給真人）；回饋是棉棉的臉變了，沒有星星和分數。
 - 設計在 [docs/design.md](docs/design.md)，改設計時一起改它；草圖在 `docs/mockups/`。
 - 畫風：**棉花糖雲朵風**，只做一種（霧面、沒有框線、粉彩漸層、圓圓軟軟）。要和兄弟 APP 的畫風**不一樣**。
 - 每次玩多久由家長設定（預設 15 分鐘，5／10／15／20／30），時間到了說「換你去做了！去跟爸爸媽媽說說你今天的心情」。
-- 搥枕頭以用力點為主、搖手機為輔（加速度感應器不用權限），家長可關。
+- 搥枕頭以用力點為主、搖手機為輔（加速度感應器不用權限）；搖手機 0.1.1 起預設關掉、家長可以打開，APP 在背景時感應器關掉。
+- 玩的時間（選項 A，使用者 2026-11-26 決定）：只有家長從家長模式「打開冷靜小屋」的那一次不限時、不算玩的時間；小朋友自己從小屋走進去的冷靜小屋照常算，時間到了正在做的方法先做完（最多再兩分鐘，`calmBusyProvider`）。家長關卡、家長模式、背景的時間不算；關掉 APP 不到十分鐘回來接著算（`Game.sitting`）。
 - 技術名稱：Flutter 專案 `feelings_house`、applicationId `com.yaufan.feelingshouse`、APK `feelings-house-版本-arm64.apk`、簽章環境變數 `FEELINGS_HOUSE_KEYSTORE`。
-- 資安：不接受別的 APP 傳來的頁面（`flutter_deeplinking_enabled` 關掉、`overridePlatformDefaultLocation`），家長模式只能從家長關卡進去（`ParentPass`），不要任何權限。
+- 資安：不接受別的 APP 傳來的頁面（`flutter_deeplinking_enabled` 關掉、`overridePlatformDefaultLocation`），家長模式只能從家長關卡進去（`ParentPass`），不要任何權限；關掉 Android 的備份（`allowBackup`、`data_extraction_rules.xml`）。家長關卡和家長模式五分鐘沒碰或 APP 到背景就關掉（`ParentIdle`）；答錯三次鎖 1／5／15 分鐘，存在檔案裡（`GateLock`）。
 - 不連網、不定位、沒有廣告、沒有帳號。以後上架要收費：免費下載一部分，一次買斷完整版，購買只在家長模式（要過家長關卡）。
 - 每個動作都要有音效，全部用程式合成。
 - 授權：非商業使用（`LICENSE`），中英文版本；別人做的部分（字型）在 `NOTICE.md`。
@@ -60,9 +61,16 @@
 - `app/lib/core/`：心情和相近的心情（`feelings.dart`）、棉棉的臉和身體的參數（`looks.dart`：8 個泡泡、眉毛、眼睛、嘴巴、眼淚、旁邊的小東西，`Look.lerp` 慢慢變）、20 個小故事和問題卡（`stories.dart`：對的心情、小小的答案、畫面上東西的位置、家長一起說；`HelpWay` 是怎麼辦的三個好方法）、冷靜小屋六個方法（`calm.dart`）、設定、日記、出題（`game.dart`：`faceQuestion`、`storyQuestion`，相近的心情不會一起當錯的選項）、存檔、聲音、語音、搖手機（`shake.dart`，sensors_plus，不用權限）。
 - `app/lib/app/cloud.dart`：棉棉、小雨、大人、朋友、弟弟都是 `CloudPainter` 照參數畫的，不是圖檔（`docs/art.md`）；`widgets.dart` 是按鈕（`Pressable` 用原始的手指事件）、心情卡、對話框。
 - `app/lib/features/`：小屋（`home/`）、認表情（`faces/`）、小故事（`story/`，畫面在 `story_picture.dart`）、怎麼辦（`help/`）、冷靜小屋（`calm/`：`calm_views.dart` 是六個方法）、心情日記（`diary/`）、家長一起說（`talk/`）、休息（`rest/`）、家長關卡和家長模式（`parent/`）。
-- 冷靜小屋不受休息時間限制（`RestGuard` 不管 `/calm`）；家長模式可以一鍵打開。
+- 冷靜小屋：家長模式一鍵打開的那一次不受休息時間限制（`RestGuard` 看到從 `/parent` 走到 `/calm`）；小朋友自己走進去的照常算時間，正在做的方法先做完。
+- 手機的返回鍵：`BackTo`（`widgets.dart`，`PopScope`）。房間的 `TopBar` 自己帶著，返回和畫面上的返回一樣；小屋和休息畫面什麼都不做；家長模式回小屋。
+- 語音：`speak` 回傳念完的 `Future`；`HushOnLeave` 離開畫面只停自己的話；`Later` 等念完再往下（小故事的生氣、日記的「說給爸爸媽媽聽」）。聲音走媒體音量（`soundContext`）。
 - 圖：`design/art/`（`kit.py` 棉花糖畫法、`house.py`、`props.py`、`scenes.py`、`mianmian.py` 讀 `looks.dart` 畫棉棉、`icon.py`；`build.py all`、`sheet`、`fluttercheck`）；聲音：`design/sounds/make_sounds.py`（42 個檔）。
 
-## 目前的狀態（2026-11-15）
+## 目前的狀態（2026-11-26）
 - 0.1.0 已發布（2026-11-15）：Releases 有三個 APK，App 和 Release 都成功；Secrets 加好了。
-- 還沒在真手機上試過：TTS 的聲音、搖手機的力道（`SystemShakes.threshold`）、聲音好不好聽，要使用者裝到手機後再看。
+- 0.1.1（修正版）做好了、測試都過了，推到工作分支，**還沒發布**（還沒推 `main`，推之前要先問使用者）。修了：
+  - 冷靜小屋和玩的時間照選項 A；家長關卡、家長模式、背景的時間不算；關掉再開十分鐘內接著算；手機時間往回調不會多玩。
+  - 返回鍵不會關掉 APP；家長關卡和家長模式五分鐘沒碰或到背景就關掉；家長關卡的鎖 1／5／15 分鐘、存起來。
+  - 搖手機預設關掉、背景時不聽；聲音走媒體音量、不搶音訊焦點；Android 11+ 找得到語音引擎；離開畫面只停自己的話、背景不念；關掉 Android 備份；GitHub 檢查多擋相機、麥克風、聯絡人、相片、高取樣率感應器。
+  - 測試在 `app/test/screens_test.dart`（新的）、`rules_test.dart`、`safety_test.dart`。示範影片沒有重做（只有搥枕頭下面「也可以搖一搖手機」那行，現在要家長打開才出現）。
+- 還沒在真手機上試過：TTS 的聲音、搖手機的力道（`SystemShakes.threshold`）、聲音好不好聽、靜音／震動時聽不聽得到，要使用者裝到手機後再看。

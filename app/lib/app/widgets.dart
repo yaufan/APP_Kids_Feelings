@@ -77,15 +77,18 @@ class Later {
     if (after == null) {
       _heard = true;
     } else {
-      after.timeout(atMost).then((_) => _hear(), onError: (_) => _hear());
+      _limit = Timer(atMost, _hear);
+      after.then((_) => _hear(), onError: (_) => _hear());
     }
   }
 
   final VoidCallback _then;
   late final Timer _timer;
+  Timer? _limit;
   var _timeUp = false, _heard = false, _over = false;
 
   void _hear() {
+    _limit?.cancel();
     _heard = true;
     _fire();
   }
@@ -99,6 +102,7 @@ class Later {
   void cancel() {
     _over = true;
     _timer.cancel();
+    _limit?.cancel();
   }
 }
 

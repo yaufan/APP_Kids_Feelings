@@ -288,14 +288,13 @@ class Game {
   /// How many days the diary keeps.
   static const keepDays = 120;
 
-  /// Resting for an hour after the time ran out. A clock moved back (the
-  /// time now before the rest began) does not lock the app: it counts as
-  /// rested.
+  /// Resting for an hour after the time ran out. A clock moved back a
+  /// little does not end the rest early; moved back more than an hour, it
+  /// counts as rested (a lock that would never end).
   bool resting(DateTime now) {
     final since = restSince;
     if (since == null) return false;
-    final d = now.difference(since);
-    return !d.isNegative && d < restLength;
+    return now.difference(since).abs() < restLength;
   }
 
   DiaryEntry? entry(DateTime d) => diary[Days.key(d)];

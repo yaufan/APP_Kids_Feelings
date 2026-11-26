@@ -255,7 +255,8 @@ void main() {
       final g = const Game().rest(DateTime(2026, 11, 15, 10));
       expect(g.resting(DateTime(2026, 11, 15, 10, 30)), isTrue);
       expect(g.resting(DateTime(2026, 11, 15, 11)), isFalse);
-      expect(g.resting(DateTime(2026, 11, 15, 9, 59)), isFalse, reason: 'the clock went back a minute');
+      expect(g.resting(DateTime(2026, 11, 15, 9, 59)), isTrue, reason: 'the clock went back a minute: the rest does not end early');
+      expect(g.resting(DateTime(2026, 11, 15, 8, 59)), isFalse, reason: 'the clock went back more than an hour');
       expect(g.resting(DateTime(2026, 11, 14, 10)), isFalse, reason: 'the clock went back a day');
       expect(const Game().resting(DateTime(2026, 11, 15)), isFalse);
     });

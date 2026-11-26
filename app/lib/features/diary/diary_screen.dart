@@ -24,9 +24,18 @@ class DiaryScreen extends ConsumerStatefulWidget {
   ConsumerState<DiaryScreen> createState() => _DiaryScreenState();
 }
 
-class _DiaryScreenState extends ConsumerState<DiaryScreen> {
+class _DiaryScreenState extends ConsumerState<DiaryScreen> with HushOnLeave {
   Feeling? _picked;
   var _wiggle = 0;
+
+  /// Going on after 「去跟爸爸媽媽說」 has been said.
+  Later? _then;
+
+  @override
+  void dispose() {
+    _then?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -55,11 +64,12 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
     final f = _picked;
     if (f == null) return;
     sfx(ref, 'ding');
-    speak(ref, Strings.toParents(f));
+    final said = speak(ref, Strings.toParents(f));
     final cards = ref.read(gameProvider).settings.cards;
-    Future<void>.delayed(const Duration(milliseconds: 2600), () {
+    _then?.cancel();
+    _then = Later(const Duration(milliseconds: 2600), () {
       if (mounted) context.go(cards ? '/talk?feeling=${f.name}' : '/');
-    });
+    }, after: said);
   }
 
   @override

@@ -26,7 +26,7 @@ class FacesScreen extends ConsumerStatefulWidget {
   ConsumerState<FacesScreen> createState() => _FacesScreenState();
 }
 
-class _FacesScreenState extends ConsumerState<FacesScreen> {
+class _FacesScreenState extends ConsumerState<FacesScreen> with HushOnLeave {
   late Question _q = _make(null);
   Feeling? _shown;
   final _tried = <Feeling>{};

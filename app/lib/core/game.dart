@@ -10,7 +10,7 @@ class Settings {
     this.level = Level.small,
     this.minutes = 15,
     this.cards = true,
-    this.shake = true,
+    this.shake = false,
     this.hidden = const {},
     this.english = false,
     this.music = true,
@@ -21,13 +21,15 @@ class Settings {
 
   final Level level;
 
-  /// How long one sitting may be before a rest (冷靜小屋 has no limit).
+  /// How long one sitting may be before a rest (冷靜小屋 opened from parent
+  /// mode has no limit; the one a child walks into is play time).
   final int minutes;
 
   /// 家長一起說 cards after the stories and the diary.
   final bool cards;
 
-  /// Shaking the phone thumps the pillow too (tapping always does).
+  /// Shaking the phone thumps the pillow too (tapping always does). Off
+  /// unless a parent turns it on: a child shaking hard can throw the phone.
   final bool shake;
 
   /// Feelings a parent turned off for now (「可以先關掉害怕」).
@@ -117,7 +119,7 @@ class Settings {
       level: Level.values.asNameMap()[j['level']] ?? Level.small,
       minutes: m is int && minuteChoices.contains(m) ? m : 15,
       cards: flag('cards', true),
-      shake: flag('shake', true),
+      shake: flag('shake', false),
       hidden: tidy({
         if (hidden is List)
           for (final n in hidden) ?Feeling.values.asNameMap()[n],
@@ -195,10 +197,72 @@ abstract final class Days {
   static const weekdayZh = ['一', '二', '三', '四', '五', '六', '日'];
 }
 
+/// The sitting going on when the app was last seen: how much of it was
+/// play time, and when. Opened again within ten minutes, the app goes on with
+/// it (the time it was closed is not counted); later, a new sitting starts.
+class Sitting {
+  const Sitting(this.played, this.seen);
+
+  final Duration played;
+  final DateTime seen;
+
+  Map<String, dynamic> toJson() => {'played': played.inSeconds, 'seen': seen.toIso8601String()};
+
+  static Sitting? fromJson(dynamic j) {
+    if (j is! Map) return null;
+    final p = j['played'], seen = j['seen'] is String ? DateTime.tryParse(j['seen'] as String) : null;
+    if (p is! int || p < 0 || seen == null) return null;
+    return Sitting(Duration(seconds: p), seen);
+  }
+}
+
+/// The parent gate's lock, kept in the file so restarting the app does not
+/// clear it: three wrong answers in a row lock the gate for a minute, the
+/// next three for five minutes, then fifteen; a right answer starts again.
+class GateLock {
+  const GateLock({this.misses = 0, this.locks = 0, this.since});
+
+  /// Wrong answers since the last lock (or the last right answer).
+  final int misses;
+
+  /// Locks since the last right answer.
+  final int locks;
+
+  /// When the last lock began.
+  final DateTime? since;
+
+  static const maxMisses = 3;
+  static const lengths = [Duration(minutes: 1), Duration(minutes: 5), Duration(minutes: 15)];
+
+  /// How long the last lock lasts.
+  Duration get length => lengths[(locks - 1).clamp(0, lengths.length - 1)];
+
+  /// When the lock ends (null: not locked now). A clock moved back to before
+  /// the lock began does not lock the gate: such a lock would never end.
+  DateTime? until(DateTime now) {
+    final s = since;
+    if (s == null || locks == 0 || now.isBefore(s)) return null;
+    final end = s.add(length);
+    return now.isBefore(end) ? end : null;
+  }
+
+  /// A wrong answer at [now].
+  GateLock wrong(DateTime now) => misses + 1 >= maxMisses ? GateLock(locks: locks + 1, since: now) : GateLock(misses: misses + 1, locks: locks, since: since);
+
+  Map<String, dynamic> toJson() => {'misses': misses, 'locks': locks, if (since != null) 'since': since!.toIso8601String()};
+
+  factory GateLock.fromJson(dynamic j) {
+    if (j is! Map) return const GateLock();
+    int count(Object? v) => v is int && v >= 0 ? v : 0;
+    return GateLock(misses: count(j['misses']).clamp(0, maxMisses - 1), locks: count(j['locks']), since: j['since'] is String ? DateTime.tryParse(j['since'] as String) : null);
+  }
+}
+
 /// Everything kept on the phone: the settings, the diary, the rest, which
-/// stories were told. One small file (store.dart).
+/// stories were told, the sitting, the parent gate's lock. One small file
+/// (store.dart).
 class Game {
-  const Game({this.settings = const Settings(), this.diary = const {}, this.restSince, this.told = const [], this.turn = 0});
+  const Game({this.settings = const Settings(), this.diary = const {}, this.restSince, this.told = const [], this.turn = 0, this.sitting, this.gate = const GateLock()});
 
   final Settings settings;
 
@@ -213,6 +277,11 @@ class Game {
 
   /// Counts the rounds of 怎麼辦, so the feelings take turns.
   final int turn;
+
+  /// The sitting when the app was last seen (null: none going on).
+  final Sitting? sitting;
+
+  final GateLock gate;
 
   static const restLength = Duration(hours: 1);
 
@@ -277,12 +346,14 @@ class Game {
     return best;
   }
 
-  Game copyWith({Settings? settings, Map<String, DiaryEntry>? diary, DateTime? restSince, bool clearRest = false, List<String>? told, int? turn}) => Game(
+  Game copyWith({Settings? settings, Map<String, DiaryEntry>? diary, DateTime? restSince, bool clearRest = false, List<String>? told, int? turn, Sitting? sitting, bool clearSitting = false, GateLock? gate}) => Game(
         settings: settings ?? this.settings,
         diary: diary ?? this.diary,
         restSince: clearRest ? null : (restSince ?? this.restSince),
         told: told ?? this.told,
         turn: turn ?? this.turn,
+        sitting: clearSitting ? null : (sitting ?? this.sitting),
+        gate: gate ?? this.gate,
       );
 
   Game _write(DateTime d, DiaryEntry Function(DiaryEntry e) f) {
@@ -318,9 +389,10 @@ class Game {
 
   Game nextTurn() => copyWith(turn: turn + 1);
 
-  Game rest(DateTime now) => copyWith(restSince: now);
+  /// The play time ran out: the rest begins (the sitting is over).
+  Game rest(DateTime now) => copyWith(restSince: now, clearSitting: true);
 
-  Game playOn() => copyWith(clearRest: true);
+  Game playOn() => copyWith(clearRest: true, clearSitting: true);
 
   Map<String, dynamic> toJson() => {
         'version': 1,
@@ -329,6 +401,8 @@ class Game {
         if (restSince != null) 'restSince': restSince!.toIso8601String(),
         'told': told,
         'turn': turn,
+        if (sitting != null) 'sitting': sitting!.toJson(),
+        'gate': gate.toJson(),
       };
 
   factory Game.fromJson(Map<String, dynamic>? j) {
@@ -348,6 +422,8 @@ class Game {
             if (t is String && stories.any((s) => s.id == t)) t,
       ],
       turn: turn is int && turn >= 0 ? turn : 0,
+      sitting: Sitting.fromJson(j['sitting']),
+      gate: GateLock.fromJson(j['gate']),
     );
   }
 }

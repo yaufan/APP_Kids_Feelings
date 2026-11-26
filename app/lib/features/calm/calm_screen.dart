@@ -17,8 +17,10 @@ import 'calm_views.dart';
 
 /// 冷靜小屋 (docs/design.md): six ways to calm down, each a little thing to
 /// really do with 棉棉 doing it too, 棉棉's face going from upset to 安心.
-/// No time limit (the rest guard leaves it alone); 找大人 ends the visit and
-/// sends the child to a real grown-up.
+/// Opened from parent mode it has no time limit; walked into from the house
+/// it is play time, and when the time runs out the way being done is
+/// finished first (RestGuard). 找大人 ends the visit and sends the child to a
+/// real grown-up.
 class CalmScreen extends ConsumerStatefulWidget {
   const CalmScreen({super.key, this.start});
 
@@ -29,17 +31,37 @@ class CalmScreen extends ConsumerStatefulWidget {
   ConsumerState<CalmScreen> createState() => _CalmScreenState();
 }
 
-class _CalmScreenState extends ConsumerState<CalmScreen> {
+class _CalmScreenState extends ConsumerState<CalmScreen> with HushOnLeave {
   late CalmWay? _way = widget.start;
   var _finished = false;
   final _done = <CalmWay>[];
   CalmWay? _best;
   var _hug = 0;
 
+  /// The way being done holds off the rest (calmBusyProvider) until it is
+  /// finished and 棉棉's hug has been seen and heard.
+  late final Busy _busy;
+  Later? _release;
+
   @override
   void initState() {
     super.initState();
+    _busy = ref.read(calmBusyProvider);
+    if (_way != null) _busy.start(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _say());
+  }
+
+  @override
+  void dispose() {
+    _release?.cancel();
+    _busy.end(this);
+    super.dispose();
+  }
+
+  void _letGo() {
+    _release?.cancel();
+    _release = null;
+    _busy.end(this);
   }
 
   String get _line {
@@ -51,12 +73,12 @@ class _CalmScreenState extends ConsumerState<CalmScreen> {
     return Strings.calmDone;
   }
 
-  void _say() {
-    if (mounted) speak(ref, _line.replaceAll('\n', ''));
-  }
+  Future<void> _say() => mounted ? speak(ref, _line.replaceAll('\n', '')) : Future.value();
 
   void _open(CalmWay w) {
     sfx(ref, 'whoosh');
+    _release?.cancel();
+    _busy.start(this);
     setState(() {
       _way = w;
       _finished = false;
@@ -77,7 +99,8 @@ class _CalmScreenState extends ConsumerState<CalmScreen> {
     Future<void>.delayed(const Duration(milliseconds: 500), () {
       if (mounted) sfx(ref, 'feel_calm');
     });
-    _say();
+    _release?.cancel();
+    _release = Later(const Duration(seconds: 3), _letGo, after: _say(), atMost: const Duration(seconds: 8));
   }
 
   void _pickBest(CalmWay w) {
@@ -89,11 +112,17 @@ class _CalmScreenState extends ConsumerState<CalmScreen> {
 
   void _back() {
     if (_way != null && !_finished && widget.start == null) {
+      _letGo();
       setState(() => _way = null);
       _say();
       return;
     }
     context.go('/');
+  }
+
+  void _again() {
+    _letGo();
+    setState(() => _way = null);
   }
 
   @override
@@ -225,7 +254,7 @@ class _CalmScreenState extends ConsumerState<CalmScreen> {
       Padding(
         padding: const EdgeInsets.only(bottom: 14, top: 6),
         child: Wrap(spacing: 12, runSpacing: 10, alignment: WrapAlignment.center, children: [
-          if (!adult) PillButton(label: Strings.calmAgain, color: Mallow.mint, icon: Icons.refresh_rounded, onTap: () => setState(() => _way = null)),
+          if (!adult) PillButton(label: Strings.calmAgain, color: Mallow.mint, icon: Icons.refresh_rounded, onTap: _again),
           PillButton(label: Strings.home, icon: Icons.home_rounded, onTap: () => context.go('/')),
         ]),
       ),

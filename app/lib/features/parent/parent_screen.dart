@@ -9,15 +9,23 @@ import '../../app/widgets.dart';
 import '../../core/feelings.dart';
 import '../../core/game.dart';
 import '../../core/providers.dart';
+import 'parent_gate.dart';
 
 /// Parent mode (after the gate): the age, the play time, 冷靜小屋 at once
-/// (no time limit), the cards for grown-ups, the pillow shake, which
-/// feelings, sounds, the diary week, ideas for real life, the full version.
+/// (no time limit, not play time), the cards for grown-ups, the pillow
+/// shake, which feelings, sounds, the diary week, ideas for real life, the
+/// full version. The back key, five minutes without a touch or the app going
+/// to the background take it back to the house.
 class ParentScreen extends ConsumerWidget {
   const ParentScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context, WidgetRef ref) => ParentIdle(
+        onClose: () => context.go('/'),
+        child: BackTo(onBack: () => context.go('/'), child: _page(context, ref)),
+      );
+
+  Widget _page(BuildContext context, WidgetRef ref) {
     final g = ref.watch(gameProvider);
     final s = g.settings;
     final game = ref.read(gameProvider.notifier);
@@ -127,7 +135,7 @@ class ParentScreen extends ConsumerWidget {
         ]),
         section(Strings.talkCards, [
           toggle(Strings.talkCardsSwitch, s.cards, (v) => game.settings((x) => x.copyWith(cards: v)), key: const ValueKey('cards')),
-          toggle(Strings.shake, s.shake, (v) => game.settings((x) => x.copyWith(shake: v)), key: const ValueKey('shake')),
+          toggle(Strings.shake, s.shake, (v) => game.settings((x) => x.copyWith(shake: v)), key: const ValueKey('shake'), note: Strings.shakeNote),
         ]),
         if (s.level == Level.big && s.full)
           section(Strings.feelingsTitle, [

@@ -55,7 +55,7 @@ class BalloonView extends ConsumerStatefulWidget {
   ConsumerState<BalloonView> createState() => _BalloonViewState();
 }
 
-class _BalloonViewState extends ConsumerState<BalloonView> with TickerProviderStateMixin {
+class _BalloonViewState extends ConsumerState<BalloonView> with TickerProviderStateMixin, HushOnLeave {
   late final _air = AnimationController(vsync: this, duration: BalloonView.breathIn);
   late final _away = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600));
   var _breaths = 0, _out = false, _ended = false;
@@ -239,7 +239,7 @@ class CountView extends ConsumerStatefulWidget {
   ConsumerState<CountView> createState() => _CountViewState();
 }
 
-class _CountViewState extends ConsumerState<CountView> {
+class _CountViewState extends ConsumerState<CountView> with HushOnLeave {
   final _numbers = <int, int>{};
 
   void _tap(int i) {
@@ -309,7 +309,7 @@ class HugView extends ConsumerStatefulWidget {
   ConsumerState<HugView> createState() => _HugViewState();
 }
 
-class _HugViewState extends ConsumerState<HugView> with SingleTickerProviderStateMixin {
+class _HugViewState extends ConsumerState<HugView> with SingleTickerProviderStateMixin, HushOnLeave {
   late final _rock = AnimationController(vsync: this, duration: HugView.hold);
   Offset _drag = Offset.zero;
   Offset? _start;
@@ -426,8 +426,9 @@ class _HugViewState extends ConsumerState<HugView> with SingleTickerProviderStat
 }
 
 // ---------------------------------------------------------------- 搥枕頭
-/// Thump the pillow (tap it hard, or shake the phone if the parent allows):
-/// it squashes and springs back, and 棉棉's red goes a bit each time.
+/// Thump the pillow (tap it hard, or shake the phone if the parent turned
+/// that on): it squashes and springs back, and 棉棉's red goes a bit each
+/// time.
 class PillowView extends ConsumerStatefulWidget {
   const PillowView({super.key, required this.onDone, this.shake = true});
 
@@ -438,19 +439,36 @@ class PillowView extends ConsumerStatefulWidget {
   ConsumerState<PillowView> createState() => _PillowViewState();
 }
 
-class _PillowViewState extends ConsumerState<PillowView> with SingleTickerProviderStateMixin {
+class _PillowViewState extends ConsumerState<PillowView> with SingleTickerProviderStateMixin, HushOnLeave {
   late final _squash = AnimationController(vsync: this, duration: const Duration(milliseconds: 320));
   StreamSubscription<void>? _shakes;
+  AppLifecycleListener? _life;
   var _count = 0;
 
   @override
   void initState() {
     super.initState();
-    if (widget.shake) _shakes = ref.read(shakesProvider).shakes.listen((_) => _thump());
+    if (!widget.shake) return;
+    _listen();
+    // The phone in a bag or a pocket is not a thump: the sensor is off
+    // while the app is out of sight.
+    _life = AppLifecycleListener(
+      onHide: () {
+        _shakes?.cancel();
+        _shakes = null;
+      },
+      onShow: _listen,
+    );
+  }
+
+  void _listen() {
+    if (!mounted) return;
+    _shakes ??= ref.read(shakesProvider).shakes.listen((_) => _thump());
   }
 
   @override
   void dispose() {
+    _life?.dispose();
     _shakes?.cancel();
     _squash.dispose();
     super.dispose();
@@ -533,7 +551,7 @@ class WaterView extends ConsumerStatefulWidget {
   ConsumerState<WaterView> createState() => _WaterViewState();
 }
 
-class _WaterViewState extends ConsumerState<WaterView> {
+class _WaterViewState extends ConsumerState<WaterView> with HushOnLeave {
   Offset _drag = Offset.zero;
   Offset? _start;
   int? _pointer;
@@ -632,7 +650,7 @@ class AdultView extends ConsumerStatefulWidget {
   ConsumerState<AdultView> createState() => _AdultViewState();
 }
 
-class _AdultViewState extends ConsumerState<AdultView> {
+class _AdultViewState extends ConsumerState<AdultView> with HushOnLeave {
   var _called = false, _here = false;
 
   Future<void> _call() async {

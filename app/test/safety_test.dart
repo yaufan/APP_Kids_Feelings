@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart';
+import 'package:feelings_house/core/sounds.dart';
+
 import 'package:feelings_house/core/feelings.dart';
 import 'package:feelings_house/core/game.dart';
 import 'package:feelings_house/features/parent/parent_gate.dart';
@@ -20,6 +23,47 @@ void main() {
     expect(plist, isNot(contains('UsageDescription')), reason: 'no camera, microphone, motion… prompts');
     expect(File('pubspec.yaml').readAsStringSync(), isNot(contains('source: system')));
     expect(File('android/app/build.gradle.kts').readAsStringSync(), contains('applicationId = "com.yaufan.feelingshouse"'));
+  });
+
+  test('Android 11+ can find the speech engine', () {
+    final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+    expect(manifest, contains('<action android:name="android.intent.action.TTS_SERVICE" />'));
+    expect(RegExp(r'<queries>[\s\S]*TTS_SERVICE[\s\S]*</queries>').hasMatch(manifest), isTrue);
+  });
+
+  test('the diary is not backed up or moved to another phone (只存在這支手機裡)', () {
+    final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+    expect(manifest, contains('android:allowBackup="false"'));
+    expect(manifest, contains('android:fullBackupContent="false"'));
+    expect(manifest, contains('android:dataExtractionRules="@xml/data_extraction_rules"'));
+    final rules = File('android/app/src/main/res/xml/data_extraction_rules.xml').readAsStringSync();
+    for (final part in ['cloud-backup', 'device-transfer']) {
+      final block = RegExp('<$part>([\\s\\S]*?)</$part>').firstMatch(rules)!.group(1)!;
+      for (final domain in ['root', 'file', 'database', 'sharedpref', 'external']) {
+        expect(block, contains('<exclude domain="$domain" path="." />'), reason: '$part $domain');
+      }
+    }
+  });
+
+  test('the GitHub check fails on a camera, microphone, contacts, photos or location permission', () {
+    for (final f in ['../.github/workflows/app.yml', '../.github/workflows/release.yml']) {
+      final yml = File(f).readAsStringSync();
+      for (final p in ['INTERNET', 'LOCATION', 'AD_ID', 'CAMERA', 'RECORD_AUDIO', 'READ_CONTACTS', 'READ_MEDIA_', 'READ_EXTERNAL_STORAGE', 'HIGH_SAMPLING_RATE_SENSORS']) {
+        expect(RegExp("grep -E '[^']*$p").hasMatch(yml), isTrue, reason: '$f $p');
+      }
+    }
+  });
+
+  test('sounds play on the media stream, not the ringer, and never take the audio focus', () {
+    final a = soundContext.android;
+    expect(a.usageType, AndroidUsageType.media);
+    expect(a.contentType, AndroidContentType.music);
+    expect(a.audioFocus, AndroidAudioFocus.none);
+    expect(soundContext.iOS.category, AVAudioSessionCategory.ambient);
+    final code = File('lib/core/sounds.dart').readAsStringSync();
+    expect(code, isNot(contains('respectSilence: true')));
+    expect(code, contains('audioContext: soundContext'), reason: 'every sound pool');
+    expect(code, contains('loop.setAudioContext(soundContext)'), reason: 'the music');
   });
 
   test('the plugins ask for no permission either', () {

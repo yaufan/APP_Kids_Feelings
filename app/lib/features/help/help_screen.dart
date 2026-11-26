@@ -27,7 +27,7 @@ class HelpScreen extends ConsumerStatefulWidget {
   ConsumerState<HelpScreen> createState() => _HelpScreenState();
 }
 
-class _HelpScreenState extends ConsumerState<HelpScreen> {
+class _HelpScreenState extends ConsumerState<HelpScreen> with HushOnLeave {
   late final Story _story;
   late final Feeling _feels;
   /// The child's own feeling for the second round (null: none of them is

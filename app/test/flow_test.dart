@@ -48,8 +48,8 @@ void main() {
       await app.tapLabel('回小屋', ms: 700);
       expect(app.location, '/');
 
-      // 大 from here on.
-      app.change((g) => g.copyWith(settings: g.settings.copyWith(level: Level.big)));
+      // 大 from here on (and a parent lets a shake thump the pillow too).
+      app.change((g) => g.copyWith(settings: g.settings.copyWith(level: Level.big, shake: true)));
       await app.settle();
       await app.tapLabel('認表情', ms: 700);
       expect(find.byType(FeelingCard), findsNWidgets(4));
@@ -216,11 +216,15 @@ void main() {
       expect(find.byKey(const ValueKey('way-water')), findsNothing, reason: '小小 has three ways');
       await shot('24_calm_small');
 
-      // 冷靜小屋 has no time limit; once out of it, the play time is up.
+      // 冷靜小屋 opened by a parent has no time limit and is not play time;
+      // back in the house the play time goes on, and then it is up.
       app.now = app.now.add(const Duration(minutes: 16));
       await app.settle(2600);
       expect(app.location, '/calm');
       await app.tapLabel('回小屋', ms: 600);
+      await app.settle(2600);
+      expect(app.location, '/');
+      app.now = app.now.add(const Duration(minutes: 15));
       await app.settle(2600);
       expect(app.location, '/rest');
       expect(app.voice.said.last, contains('換你去做了！去跟爸爸媽媽說說你今天的心情。'));

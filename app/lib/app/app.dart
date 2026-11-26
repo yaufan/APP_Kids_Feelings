@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/calm.dart';
 import '../core/feelings.dart';
+import '../core/game.dart';
 import '../core/providers.dart';
 import '../core/stories.dart';
 import '../features/calm/calm_screen.dart';
@@ -83,18 +84,31 @@ class FeelingsApp extends ConsumerWidget {
   }
 }
 
-/// Keeps the parent's play time: when the sitting has gone on for the
-/// minutes they set, 棉棉 yawns, the house lights come on and the child is
-/// sent to tell a grown-up about the day; an hour later (or when a parent
-/// says so) play can go on. 冷靜小屋 is never stopped (docs/design.md: 冷靜
-/// 小屋不受時間限制). Away from the app for ten minutes counts as a rest.
+/// Keeps the parent's play time (docs/design.md 「每次玩多久」): when the
+/// sitting has gone on for the minutes they set, 棉棉 yawns, the house lights
+/// come on and the child is sent to tell a grown-up about the day; an hour
+/// later (or when a parent says so) play can go on.
+///
+/// Not play time: the parent gate, parent mode, a 冷靜小屋 a parent opened
+/// from parent mode (no limit there either), and the app in the background
+/// (ten minutes away, or closed, is a rest: a new sitting). A 冷靜小屋 the
+/// child walked into is play time; when the time runs out there, the calming
+/// way being done is finished first ([finishCalm] at most). A phone clock
+/// moved back gives no extra time. The sitting is saved, so closing and
+/// opening the app again does not start it afresh.
 class RestGuard extends ConsumerStatefulWidget {
   const RestGuard({super.key, required this.child});
 
   final Widget child;
 
   static const check = Duration(seconds: 2);
-  static const awayIsRest = Duration(minutes: 10);
+  static const awayIsRest = SessionStart.awayIsRest;
+
+  /// How long a calming way being done may go on after the time is up.
+  static const finishCalm = Duration(minutes: 2);
+
+  /// The sitting is saved this often (in checks: 30 seconds).
+  static const saveEvery = 15;
 
   @override
   ConsumerState<RestGuard> createState() => _RestGuardState();
@@ -103,19 +117,64 @@ class RestGuard extends ConsumerStatefulWidget {
 class _RestGuardState extends ConsumerState<RestGuard> {
   Timer? _timer;
   AppLifecycleListener? _life;
+  late final GoRouter _router;
+
+  /// When the app went out of sight.
   DateTime? _away;
+
+  /// When the time stopped being play (a parent screen, a calm room a
+  /// parent opened); it is given back to the child when it ends.
+  DateTime? _offSince;
+
+  /// The calm room showing now was opened from parent mode.
+  var _parentCalm = false;
+  var _path = '';
+
+  /// The phone's clock at the last check (to notice it moved back).
+  late DateTime _seen;
+  var _checks = 0;
+
+  DateTime get _now => ref.read(clockProvider)();
+
+  SessionStart get _session => ref.read(sessionStartProvider.notifier);
+
+  String get _at => _router.routerDelegate.currentConfiguration.isEmpty ? '' : _router.state.matchedLocation;
+
+  /// A parent screen is showing: the gate or parent mode.
+  bool get _parentSight => _path.startsWith('/parent') || ParentGatePage.showing.value > 0;
 
   @override
   void initState() {
     super.initState();
     ref.read(sessionStartProvider);
+    _router = ref.read(routerProvider);
+    _seen = _now;
+    _path = _at;
+    _router.routerDelegate.addListener(_routed);
+    ParentGatePage.showing.addListener(_soon);
     _timer = Timer.periodic(RestGuard.check, (_) => _check());
     _life = AppLifecycleListener(
-      onHide: () => _away = ref.read(clockProvider)(),
+      onHide: () {
+        _away = _now;
+        _look();
+        _remember();
+      },
       onShow: () {
-        final away = _away;
+        final away = _away, now = _now;
         _away = null;
-        if (away != null && ref.read(clockProvider)().difference(away) >= RestGuard.awayIsRest) ref.read(sessionStartProvider.notifier).restart();
+        if (away != null) {
+          final gone = now.difference(away);
+          if (gone >= RestGuard.awayIsRest) {
+            _session.restart();
+          } else {
+            // A few minutes in the background are not play time either (a
+            // clock moved back meanwhile makes [gone] negative and takes
+            // that back too).
+            _session.shift(gone);
+          }
+        }
+        _seen = now;
+        _look();
         _check();
       },
     );
@@ -125,31 +184,92 @@ class _RestGuardState extends ConsumerState<RestGuard> {
   void dispose() {
     _timer?.cancel();
     _life?.dispose();
+    _router.routerDelegate.removeListener(_routed);
+    ParentGatePage.showing.removeListener(_soon);
     super.dispose();
   }
 
-  void _check() {
+  void _routed() {
     if (!mounted) return;
-    final now = ref.read(clockProvider)();
+    final from = _path, to = _at;
+    _path = to;
+    // Only the calm room a parent opened from parent mode is outside the
+    // play time; coming back to the house ends it.
+    _parentCalm = to.startsWith('/calm') && (from.startsWith('/parent') || (_parentCalm && from.startsWith('/calm')));
+    _soon();
+  }
+
+  /// [_look] right after the screen being built or taken away (it changes
+  /// the sitting, which may not change while widgets are being built).
+  void _soon() => scheduleMicrotask(_look);
+
+  /// Starts or ends the time that is not play (in sight only: the
+  /// background is counted on return).
+  void _look() {
+    if (!mounted) return;
+    final now = _now;
+    final off = _away == null && (_parentSight || _parentCalm);
+    if (off) {
+      _offSince ??= now;
+    } else if (_offSince != null) {
+      final d = now.difference(_offSince!);
+      _offSince = null;
+      if (!d.isNegative) _session.shift(d);
+    }
+  }
+
+  /// Moves the sitting (and the time off, so it is not given back twice)
+  /// by [d].
+  void _move(Duration d) {
+    _session.shift(d);
+    final o = _offSince;
+    if (o != null) _offSince = o.add(d);
+  }
+
+  /// Saves how much of the sitting was play, so the app opened again soon
+  /// goes on with it.
+  void _remember() {
+    if (!mounted) return;
     final g = ref.read(gameProvider);
-    final router = ref.read(routerProvider);
-    final path = router.state.matchedLocation;
-    if (path.startsWith('/parent') || path.startsWith('/calm')) return;
+    if (g.restSince != null) return;
+    final now = _now;
+    var played = now.difference(ref.read(sessionStartProvider));
+    final o = _offSince;
+    if (o != null) played -= now.difference(o);
+    if (played.isNegative) played = Duration.zero;
+    ref.read(gameProvider.notifier).change((g) => g.copyWith(sitting: Sitting(played, now)));
+  }
+
+  void _check() {
+    // Nothing while the app is out of sight (its timer can go on in the
+    // background): that time is not play, and it is looked at on return.
+    if (!mounted || _away != null) return;
+    final now = _now;
+    if (now.isBefore(_seen)) _move(now.difference(_seen));
+    _seen = now;
+    _path = _at;
+    _look();
+    if (++_checks % RestGuard.saveEvery == 0) _remember();
+    if (_parentSight || _parentCalm) return;
+    final g = ref.read(gameProvider);
+    final path = _path;
     if (g.restSince != null) {
       if (g.resting(now)) {
-        if (path != '/rest') router.go('/rest');
+        if (path != '/rest') _router.go('/rest');
         return;
       }
       ref.read(gameProvider.notifier).change((g) => g.playOn());
-      ref.read(sessionStartProvider.notifier).restart();
-      if (path == '/rest') router.go('/');
+      _session.restart();
+      if (path == '/rest') _router.go('/');
       return;
     }
     if (path == '/rest') return;
-    if (now.difference(ref.read(sessionStartProvider)) >= Duration(minutes: g.settings.minutes)) {
-      ref.read(gameProvider.notifier).change((g) => g.rest(now));
-      router.go('/rest');
-    }
+    final over = now.difference(ref.read(sessionStartProvider)) - Duration(minutes: g.settings.minutes);
+    if (over.isNegative) return;
+    // A calming way being done is finished first (at most [finishCalm]).
+    if (path.startsWith('/calm') && ref.read(calmBusyProvider).busy && over < RestGuard.finishCalm) return;
+    ref.read(gameProvider.notifier).change((g) => g.rest(now));
+    _router.go('/rest');
   }
 
   @override

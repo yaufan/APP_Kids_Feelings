@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import '../core/looks.dart';
 import '../core/providers.dart';
 import '../core/sounds.dart';
 import '../core/stories.dart';
+import '../core/voice.dart';
 import 'cloud.dart';
 import 'theme.dart';
 
@@ -26,12 +28,96 @@ class Art extends StatelessWidget {
       SvgPicture.asset('assets/art/$path.svg', fit: fit, alignment: alignment, excludeFromSemantics: true, errorBuilder: (_, _, _) => const SizedBox.expand());
 }
 
+/// The screen that spoke last (its WidgetRef), so a screen going away
+/// hushes only its own line, never the next screen's first one.
+Object? _speaker;
+
 /// Says a line out loud (if the parent left the voice on), with the English
-/// after it when that is on.
-void speak(WidgetRef ref, String zh, {String? en}) {
+/// after it when that is on. Completes when it has been said (or cut off by
+/// the next line).
+Future<void> speak(WidgetRef ref, String zh, {String? en}) {
   final s = ref.read(gameProvider).settings;
-  if (!s.voice) return;
-  ref.read(voiceProvider).say(zh, en: s.english ? en : null);
+  if (!s.voice) return Future.value();
+  _speaker = ref;
+  return ref.read(voiceProvider).say(zh, en: s.english ? en : null);
+}
+
+/// A screen that stops its own line when the child leaves it, so it does
+/// not go on over the next screen (and never stops the next screen's).
+mixin HushOnLeave<T extends ConsumerStatefulWidget> on ConsumerState<T> {
+  late final Voice _hush;
+  late final Object _me;
+
+  @override
+  void initState() {
+    super.initState();
+    _hush = ref.read(voiceProvider);
+    _me = ref;
+  }
+
+  @override
+  void dispose() {
+    if (identical(_speaker, _me)) {
+      _speaker = null;
+      _hush.stop();
+    }
+    super.dispose();
+  }
+}
+
+/// Runs [then] after [min], and not before the line [after] has been said
+/// (at most [atMost] of waiting for it), so a line is not cut off by the next
+/// screen; [cancel] stops it.
+class Later {
+  Later(Duration min, VoidCallback then, {Future<void>? after, Duration atMost = const Duration(seconds: 10)}) : _then = then {
+    _timer = Timer(min, () {
+      _timeUp = true;
+      _fire();
+    });
+    if (after == null) {
+      _heard = true;
+    } else {
+      after.timeout(atMost).then((_) => _hear(), onError: (_) => _hear());
+    }
+  }
+
+  final VoidCallback _then;
+  late final Timer _timer;
+  var _timeUp = false, _heard = false, _over = false;
+
+  void _hear() {
+    _heard = true;
+    _fire();
+  }
+
+  void _fire() {
+    if (_over || !_timeUp || !_heard) return;
+    _over = true;
+    _then();
+  }
+
+  void cancel() {
+    _over = true;
+    _timer.cancel();
+  }
+}
+
+/// The phone's back key (or back gesture) does what the screen's own back
+/// button does ([onBack]; null: nothing) instead of closing the app.
+class BackTo extends StatelessWidget {
+  const BackTo({super.key, this.onBack, required this.child});
+
+  final VoidCallback? onBack;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) onBack?.call();
+        },
+        child: child,
+      );
 }
 
 void sfx(WidgetRef ref, String name) => ref.read(soundsProvider).play(name);
@@ -194,7 +280,9 @@ class SpeakBubble extends StatelessWidget {
       );
 }
 
-/// The bar at the top of a room: back (or home), the room's name, the speaker.
+/// The bar at the top of a room: back (or home), the room's name, the
+/// speaker. The phone's back key does the same as its back button (on the
+/// house's front, nothing).
 class TopBar extends StatelessWidget {
   const TopBar({super.key, required this.title, this.onBack, this.onSpeak, this.homeIcon = false, this.leading});
 
@@ -205,13 +293,16 @@ class TopBar extends StatelessWidget {
   final Widget? leading;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
-        child: Row(children: [
-          leading ?? (onBack == null ? const SizedBox(width: 50) : RoundButton(label: homeIcon ? '回小屋' : '回去', icon: homeIcon ? Icons.home_rounded : Icons.chevron_left_rounded, onTap: onBack, size: 46)),
-          Expanded(child: Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Mallow.ink))),
-          if (onSpeak != null) RoundButton(label: '再聽一次', icon: Icons.volume_up_rounded, onTap: onSpeak, size: 46, color: Mallow.mint, sound: null) else const SizedBox(width: 46),
-        ]),
+  Widget build(BuildContext context) => BackTo(
+        onBack: onBack,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+          child: Row(children: [
+            leading ?? (onBack == null ? const SizedBox(width: 50) : RoundButton(label: homeIcon ? '回小屋' : '回去', icon: homeIcon ? Icons.home_rounded : Icons.chevron_left_rounded, onTap: onBack, size: 46)),
+            Expanded(child: Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Mallow.ink))),
+            if (onSpeak != null) RoundButton(label: '再聽一次', icon: Icons.volume_up_rounded, onTap: onSpeak, size: 46, color: Mallow.mint, sound: null) else const SizedBox(width: 46),
+          ]),
+        ),
       );
 }
 

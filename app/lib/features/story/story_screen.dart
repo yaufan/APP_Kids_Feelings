@@ -28,14 +28,14 @@ class StoryScreen extends ConsumerStatefulWidget {
 
 enum _Phase { ask, answered, help, helped }
 
-class _StoryScreenState extends ConsumerState<StoryScreen> {
+class _StoryScreenState extends ConsumerState<StoryScreen> with HushOnLeave {
   Story? _story;
   late Question _q;
   Feeling? _picked;
   HelpWay? _help;
   final _tried = <Feeling>{};
   var _phase = _Phase.ask;
-  Timer? _toCalm;
+  Later? _toCalm;
 
   @override
   void initState() {
@@ -77,9 +77,7 @@ class _StoryScreenState extends ConsumerState<StoryScreen> {
     return '${Strings.storyRight(_picked!, others)}${big ? '\n${Strings.ifYou}' : ''}';
   }
 
-  void _say() {
-    if (mounted && _story != null) speak(ref, _line.replaceAll('\n', ''));
-  }
+  Future<void> _say() => mounted && _story != null ? speak(ref, _line.replaceAll('\n', '')) : Future.value();
 
   void _pick(Feeling f) {
     if (_phase != _Phase.ask) return;
@@ -97,12 +95,13 @@ class _StoryScreenState extends ConsumerState<StoryScreen> {
       _phase = _Phase.answered;
     });
     sfx(ref, 'right');
-    _say();
-    // 小小: an angry answer goes straight on to calming down (docs/design.md).
+    final said = _say();
+    // 小小: an angry answer goes straight on to calming down (docs/design.md),
+    // once the answer has been said.
     if (ref.read(gameProvider).settings.level == Level.small && f == Feeling.angry) {
-      _toCalm = Timer(const Duration(milliseconds: 4500), () {
+      _toCalm = Later(const Duration(milliseconds: 4500), () {
         if (mounted && _phase == _Phase.answered) context.go('/calm?way=balloon');
-      });
+      }, after: said);
     }
   }
 

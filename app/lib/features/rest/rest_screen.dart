@@ -24,7 +24,7 @@ class RestScreen extends ConsumerStatefulWidget {
   ConsumerState<RestScreen> createState() => _RestScreenState();
 }
 
-class _RestScreenState extends ConsumerState<RestScreen> {
+class _RestScreenState extends ConsumerState<RestScreen> with HushOnLeave {
   @override
   void initState() {
     super.initState();
@@ -42,10 +42,11 @@ class _RestScreenState extends ConsumerState<RestScreen> {
     context.go('/');
   }
 
+  // The phone's back key does nothing here (the app stays on the rest).
   @override
   Widget build(BuildContext context) => WithMusic(
         music: Music.rest,
-        child: Scaffold(
+        child: BackTo(child: Scaffold(
           body: SkyBg(
             top: Mallow.night1,
             bottom: Mallow.night2,
@@ -108,6 +109,6 @@ class _RestScreenState extends ConsumerState<RestScreen> {
               }),
             ),
           ),
-        ),
+        )),
       );
 }

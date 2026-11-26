@@ -259,6 +259,45 @@ void main() {
       expect(g.resting(DateTime(2026, 11, 14, 10)), isFalse, reason: 'the clock went back a day');
       expect(const Game().resting(DateTime(2026, 11, 15)), isFalse);
     });
+
+    test('the sitting ends with the rest and with playing on', () {
+      final g = const Game().copyWith(sitting: Sitting(const Duration(minutes: 4), DateTime(2026, 11, 15, 10)));
+      expect(g.rest(DateTime(2026, 11, 15, 10)).sitting, isNull);
+      expect(g.playOn().sitting, isNull);
+    });
+  });
+
+  group('the parent gate lock', () {
+    test('three wrong answers lock it for 1, then 5, then 15 minutes; a right answer starts again', () {
+      final t0 = DateTime(2026, 11, 15, 10);
+      var lock = const GateLock();
+      GateLock miss3(GateLock l, DateTime at) => l.wrong(at).wrong(at).wrong(at);
+      lock = lock.wrong(t0).wrong(t0);
+      expect(lock.until(t0), isNull, reason: 'two wrong answers do not lock it');
+      lock = lock.wrong(t0);
+      expect(lock.until(t0), t0.add(const Duration(minutes: 1)));
+      final t1 = t0.add(const Duration(minutes: 2));
+      expect(lock.until(t1), isNull);
+      lock = miss3(lock, t1);
+      expect(lock.until(t1), t1.add(const Duration(minutes: 5)));
+      final t2 = t1.add(const Duration(minutes: 6));
+      lock = miss3(lock, t2);
+      expect(lock.until(t2), t2.add(const Duration(minutes: 15)));
+      final t3 = t2.add(const Duration(minutes: 16));
+      lock = miss3(lock, t3);
+      expect(lock.until(t3), t3.add(const Duration(minutes: 15)), reason: 'never longer than fifteen minutes');
+      expect(const GateLock().wrong(t3).until(t3), isNull, reason: 'a right answer starts again');
+    });
+
+    test('a clock moved back does not make a lock that never ends; it survives the save file', () {
+      final t0 = DateTime(2026, 11, 15, 10);
+      final lock = const GateLock().wrong(t0).wrong(t0).wrong(t0);
+      expect(lock.until(t0.subtract(const Duration(hours: 3))), isNull);
+      expect(lock.until(t0.add(const Duration(seconds: 30))), isNotNull);
+      final back = Game.fromJson(jsonDecode(jsonEncode(const Game().copyWith(gate: lock).toJson())) as Map<String, dynamic>);
+      expect(back.gate.until(t0.add(const Duration(seconds: 30))), t0.add(const Duration(minutes: 1)));
+      expect(GateLock.fromJson({'misses': 9, 'locks': -2, 'since': 4}).until(t0), isNull);
+    });
   });
 
   group('stories take turns', () {
@@ -284,7 +323,8 @@ void main() {
           .best(DateTime(2026, 11, 14), CalmWay.balloon)
           .toldStory('milk')
           .nextTurn()
-          .rest(DateTime(2026, 11, 14, 10));
+          .rest(DateTime(2026, 11, 14, 10))
+          .copyWith(sitting: Sitting(const Duration(minutes: 3), DateTime(2026, 11, 14, 9)), gate: GateLock(misses: 1, locks: 2, since: DateTime(2026, 11, 14, 8)));
       final back = Game.fromJson(jsonDecode(jsonEncode(g.toJson())) as Map<String, dynamic>);
       expect(jsonEncode(back.toJson()), jsonEncode(g.toJson()));
       expect(back.settings.level, Level.big);
@@ -292,6 +332,14 @@ void main() {
       expect(back.today(DateTime(2026, 11, 14)), Feeling.proud);
       expect(back.told, ['milk']);
       expect(back.restSince, DateTime(2026, 11, 14, 10));
+      expect(back.sitting!.played, const Duration(minutes: 3));
+      expect(back.gate.locks, 2);
+    });
+
+    test('shaking the phone is off unless a parent turns it on', () {
+      expect(const Settings().shake, isFalse);
+      expect(Settings.fromJson(const {}).shake, isFalse);
+      expect(Settings.fromJson(const {'shake': true}).shake, isTrue, reason: 'a parent who turned it on keeps it');
     });
 
     test('a broken or strange file gives a fresh, safe game', () {
@@ -302,6 +350,7 @@ void main() {
         'restSince': 12,
         'told': ['milk', 'nothing', 3],
         'turn': -4,
+        'sitting': {'played': -3, 'seen': 'later'},
       });
       expect(g.settings.level, Level.small);
       expect(g.settings.minutes, 15);
@@ -312,6 +361,7 @@ void main() {
       expect(g.restSince, isNull);
       expect(g.told, ['milk']);
       expect(g.turn, 0);
+      expect(g.sitting, isNull);
     });
 
     test('a file cut off halfway falls back to the save before', () async {

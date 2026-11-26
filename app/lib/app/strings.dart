@@ -93,9 +93,12 @@ abstract final class Strings {
   static const callParent = '請爸爸媽媽來幫忙喔！';
   static const parentGateTitle = '家長確認';
   static String gateQuestion(String a, String b) => '$a 加 $b 等於多少？';
-  static const gateRules = '答錯三次要等一分鐘。';
+  static const gateRules = '答錯三次要等一分鐘，再錯三次會等更久。';
   static const wrongAnswer = '不對喔，換一題。';
-  static String gateWait(int s) => '請等 $s 秒再試';
+  static String gateWait(Duration d) {
+    final s = (d.inMilliseconds / 1000).ceil();
+    return s > 60 ? '請等 ${(s + 59) ~/ 60} 分鐘再試' : '請等 $s 秒再試';
+  }
   static const backspace = '刪掉';
   static const cancel = '取消';
 
@@ -106,14 +109,15 @@ abstract final class Strings {
   static const ageNote = '小小：開心、難過、生氣、害怕四種心情，一次兩個選項，冷靜小屋有吹氣球、抱抱、找大人。大：十四種心情，四個選項，小故事會多問「如果是你呢？」，冷靜小屋六個方法都有。';
   static const playTime = '每次可以玩多久';
   static String minutes(int m) => '$m 分鐘';
-  static const playTimeNote = '時間到了棉棉打哈欠、小屋的燈亮起來，APP 說「換你去做了！」。要家長解開，或等一個小時，才能再玩。冷靜小屋不受時間限制。';
+  static const playTimeNote = '時間到了棉棉打哈欠、小屋的燈亮起來，APP 說「換你去做了！」。要家長解開，或等一個小時，才能再玩。小朋友自己走進冷靜小屋，也算玩的時間：時間到了，正在做的方法會先做完（最多再兩分鐘），再去休息。家長模式和 APP 放在背景的時間不算。';
   static const playOn = '讓小朋友再玩一次（重新計時）';
   static const resting = '現在是休息時間。';
   static const openCalm = '打開冷靜小屋（不限時間）';
-  static const openCalmNote = '小朋友真的在生氣、難過的時候，直接帶他到冷靜小屋。';
+  static const openCalmNote = '小朋友真的在生氣、難過的時候，直接帶他到冷靜小屋。從這裡打開的冷靜小屋不限時間，休息時間也可以用，而且不算玩的時間；回到小屋以後照常計時。';
   static const talkCards = '家長一起說';
   static const talkCardsSwitch = '每個故事和日記後，出現給大人的問題卡';
   static const shake = '搥枕頭時，搖手機也可以';
+  static const shakeNote = '預設關掉：生氣時用力甩手機，可能摔到或打到人。打開的話，請大人在旁邊握著手機。（搥枕頭只有「大」才有）';
   static const feelingsTitle = '要哪些心情';
   static const feelingsNote = '可以先關掉一些（例如害怕），之後再打開；開心和安心一定有。';
   static const feelingsMin = '開心、難過、生氣、害怕至少要留兩種（小小只玩這四種）。';

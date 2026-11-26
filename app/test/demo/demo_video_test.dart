@@ -247,7 +247,7 @@ void main() {
     mark('pillow');
     await label('再做一個');
     await seconds(1);
-    caption.value = '搥枕頭：用力點枕頭，噗！噗！\n棉棉的紅色一下一下退掉（也可以搖手機）';
+    caption.value = '搥枕頭：用力點枕頭，噗！噗！\n棉棉的紅色一下一下退掉（家長打開的話，也可以搖手機）';
     await label('搥枕頭');
     await seconds(1.5);
     for (var i = 0; i < 8; i++) {

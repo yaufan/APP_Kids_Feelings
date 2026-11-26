@@ -26,7 +26,7 @@ class TalkScreen extends ConsumerStatefulWidget {
   ConsumerState<TalkScreen> createState() => _TalkScreenState();
 }
 
-class _TalkScreenState extends ConsumerState<TalkScreen> {
+class _TalkScreenState extends ConsumerState<TalkScreen> with HushOnLeave {
   late final List<TalkCard> _cards = [?widget.story?.card, if (widget.feeling != null) feelingCards[widget.feeling]!];
   var _at = 0;
 
